@@ -1,26 +1,27 @@
 import java.util.ArrayList;
 
+//contains info about the class
 public class Class
 {
 
 	private boolean isAbstract;
-	
+
 	private Visibility visibility;
-	
+
 	private String name;
 	private ArrayList<Method> methods;
 	private ArrayList<Variable> variables;
-	
+
 	public Class()
 	{
 		this("");
 	}
-	
+
 	public Class(String name)
 	{
 		this(name, false, Visibility.PUBLIC);
 	}
-	
+
 	public Class(String name, boolean ab, Visibility v)
 	{
 		visibility = v;
@@ -33,12 +34,12 @@ public class Class
 	{
 		methods.add(m);
 	}
-	
+
 	public void addvariable(Variable m)
 	{
 		variables.add(m);
 	}
-	
+
 	public Visibility getVisibility()
 	{
 		return visibility;
@@ -68,37 +69,37 @@ public class Class
 	{
 		this.name = name;
 	}
-	
+
 	public ArrayList<Method> getMethods()
 	{
 		return methods;
 	}
-	
+
 	public ArrayList<Variable> getVariables()
 	{
 		return variables;
 	}
-	
+
 	public String getDisplay()
 	{
 		String vars = "";
-		for(Variable v : variables)
+		for (Variable v : variables)
 			vars += "\n\t" + v.getDisplay();
-		
+
 		String meths = "";
-		for(Method m : methods)
+		for (Method m : methods)
 			meths += "\n\t" + m.getDisplay();
 		return visibility.getWord() + " class " + name + vars + "\n" + meths;
 	}
-	
+
 	public String toString()
 	{
 		String vars = "";
-		for(Variable v : variables)
+		for (Variable v : variables)
 			vars += "\n\t" + v;
-		
+
 		String meths = "";
-		for(Method m : methods)
+		for (Method m : methods)
 			meths += "\n\t" + m;
 		return visibility.getWord() + " class " + name + vars + "\n" + meths;
 	}

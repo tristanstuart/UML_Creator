@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.IOException;
 import java.text.AttributedString;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Scanner;
 
 import javax.imageio.ImageIO;
@@ -17,13 +16,18 @@ import javax.imageio.ImageIO;
 public class UMLData
 {
 
-	private static String path;
+	private static final boolean DEBUG = false;
+	private static String directory;
 
 	public static void main(String[] args) throws IOException
 	{
-		path = "E:\\_I HATE UML\\" + args[0].substring(args[0].lastIndexOf("/", args[0].lastIndexOf("/") - 1) + 1, args[0].lastIndexOf("/")) + "\\UML\\" + "game\\";
-
-		Class[] classes = getClasses(args);
+		if (args.length < 1)
+		{
+			System.out.println("No directory argument provided! Exiting...");
+			System.exit(1);
+		}
+		directory = args[0];
+		Class[] classes = getClasses();
 
 		for (int i = 0; i < classes.length; i++)
 			drawClass(classes[i]);
@@ -102,16 +106,18 @@ public class UMLData
 
 		try
 		{
-			new File(path).mkdirs();
-			File asdf = new File(path + c.getName() + ".png");
-			asdf.createNewFile();
-			ImageIO.write(img, "png", asdf);
+			File outputDir = new File(directory, "UML_Outout");
+			outputDir.mkdirs();
+			File outputFile = new File(outputDir, c.getName() + ".png");
+			outputFile.createNewFile();
+			ImageIO.write(img, "png", outputFile);
 		} catch (IOException e)
 		{
 			e.printStackTrace();
 		}
 	}
 
+	// finds the width of the class box by getting the longest method or variable and measuring the length
 	public static int getClassWidth(Class c, Graphics g)
 	{
 		String longest = "";
@@ -126,38 +132,37 @@ public class UMLData
 		return g.getFontMetrics().stringWidth(longest);
 	}
 
-	public static Class[] getClasses(String args[]) throws IOException
+	// parses .java files in a given directory into usable object representations
+	public static Class[] getClasses() throws IOException
 	{
 		ArrayList<Class> classes = new ArrayList<Class>();
-		if (args.length < 1)
-		{
-			System.err.println("not enough args, exiting...");
-			System.exit(1);
-		}
 
-		String directory = args[0];
 		File dir = new File(directory);
 		File[] files = dir.listFiles();
 
+		// loop all files in the directory
 		for (int i = 0; i < files.length; i++)
 		{
+			// skip files that arent .java files
 			if (!files[i].getName().endsWith(".java"))
 				continue;
 			Scanner sc = new Scanner(files[i]);
 			Class c = null;
+			// read whole file
 			while (sc.hasNext())
 			{
 				String ln = sc.nextLine().trim();
+				// doesnt support package visibility, also does not support enums or interfaces
 				if (ln.startsWith(Visibility.PUBLIC.getWord()) || ln.startsWith(Visibility.PRIVATE.getWord()) || ln.startsWith(Visibility.PROTECTED.getWord()))
 				{
-					if (ln.contains(" class "))
+					if (ln.contains(" class "))// if this is a class
 					{
 						c = new Class();
 						String[] keywords = ln.split(" ");
-						if (ln.contains("extends"))
+						if (ln.contains("extends")) // the last word in the class definition is usually the class name, unless there is an extends
 						{
 							int j = 0;
-							for (; j < keywords.length; j++)
+							for (; j < keywords.length; j++)// does not support classes that implement interfaces
 								if (keywords[j].equals("extends"))
 									break;
 							c.setName(keywords[j - 1]);
@@ -173,12 +178,10 @@ public class UMLData
 						if (ln.contains("abstract"))
 							c.setAbstract(true);
 					}
-
-					// you dont make good money do
-
-					if (ln.endsWith(";") && c != null)
+					// out of basic class, method, and variable definitions, variables are the only ones that end with a semicolon
+					if (ln.endsWith(";") && c != null) // so this must be a variable
 					{
-						Visibility visibility = Visibility.PUBLIC;
+						Visibility visibility = Visibility.PUBLIC;// does not support package visiblility
 						if (ln.contains("public"))
 							visibility = Visibility.PUBLIC;
 						else if (ln.contains("private"))
@@ -191,8 +194,9 @@ public class UMLData
 						String type = "";
 
 						String keywords[] = ln.split(" ");
-						type = keywords[1 + (isStatic ? 1 : 0) + (isFinal ? 1 : 0)];
+						type = keywords[1 + (isStatic ? 1 : 0) + (isFinal ? 1 : 0)];// type definition is defined after static and final are declared
 
+						// this loop accounts for comma separated variable declarations of the same type, including if those variables are set to a value
 						for (int j = 2 + (isStatic ? 1 : 0) + (isFinal ? 1 : 0); j < keywords.length; j++)
 						{
 							String name = keywords[j];
@@ -201,20 +205,25 @@ public class UMLData
 								j++;
 								continue;
 							}
-							if (name.contains(",") || name.contains(";"))
+							if (name.contains(",") || name.contains(";"))// take off any punctuation
 								c.addvariable(new Variable(name.substring(0, name.length() - 1), type, visibility, isStatic, isFinal));
 							else
 								c.addvariable(new Variable(name, type, visibility, isStatic, isFinal));
 						}
 					}
 
+					// method declarations contain ( ) so this must be a method
 					if (ln.endsWith(")") && ln.contains("(") && c != null)
 					{
+						// isolate the method name by searching backwards for the last space before the '('
+						// use that as the start and the index of the '(' as the end to get the method name
 						Method m = new Method(ln.substring(ln.lastIndexOf(' ', ln.indexOf('(')), ln.indexOf('(')));
+						// cut the method declaration in half by the '(', left half is visibility, static, abstract, and final, right half is parameters
 						String[] keywords = ln.split("\\(");
 						String modifiers = keywords[0];
 						String params = keywords[1];
 
+						// does not support package visibility
 						Visibility visibility = Visibility.PUBLIC;
 						if (modifiers.contains("public"))
 							visibility = Visibility.PUBLIC;
@@ -227,24 +236,29 @@ public class UMLData
 						boolean isFinal = modifiers.contains("final");
 						boolean isAbstract = modifiers.contains("abstract");
 						String returnType = "";
-						System.out.println("classname  " + c.getName());
-						if (modifiers.contains(c.getName()))
+						if (DEBUG)
+							System.out.println("classname  " + c.getName());
+						if (modifiers.contains(c.getName()))// check if the return type is the class containing the method
 						{
-							if (!m.getName().equals(c.getName()))
+							if (!m.getName().equals(c.getName()))// if the method is not a constructor, the return type must be the class
 								returnType = c.getName();
 						} else
-						{
-							System.out.println(modifiers + "  " + modifiers.lastIndexOf(' ', modifiers.lastIndexOf(' ') - 1) + " " + modifiers.lastIndexOf(' '));
-							returnType = modifiers.substring(modifiers.lastIndexOf(' ', modifiers.lastIndexOf(' ') - 1), modifiers.lastIndexOf(' ')).trim();
+						{// split out the return type by getting the substring from the 2nd to last space and the last space
+							int lastSpace = modifiers.lastIndexOf(' ');
+							if (DEBUG)
+								System.out.println(modifiers + "  " + modifiers.lastIndexOf(' ', lastSpace - 1) + " " + lastSpace);
+							returnType = modifiers.substring(modifiers.lastIndexOf(' ', lastSpace - 1), lastSpace).trim();
 						}
 
-						System.out.println("\t\t\t" + modifiers + ": " + returnType);
+						if (DEBUG)
+							System.out.println("\t\t\t" + modifiers + ": " + returnType);
 
 						m.setType(returnType);
 						m.setFinal(isFinal);
 						m.setAbstract(isAbstract);
 						m.setStatic(isStatic);
 
+						// if the ')' is not directly following '(', there must be parameters
 						if (ln.indexOf('(') + 1 != ln.indexOf(')'))
 						{
 							params.replace("\\(", "");
@@ -252,11 +266,11 @@ public class UMLData
 							for (String p : params.split(", "))
 							{
 								boolean argFinal = p.contains("final");
-								String asdf[] = p.split(" ");
-								String type = asdf[0 + (argFinal ? 1 : 0)];
-								String name = asdf[1 + (argFinal ? 1 : 0)];
+								String paramModifiers[] = p.split(" ");
+								String type = paramModifiers[0 + (argFinal ? 1 : 0)];
+								String name = paramModifiers[1 + (argFinal ? 1 : 0)];
 								name.trim();
-								if (name.endsWith(",") || name.endsWith(";") || name.endsWith(")"))
+								if (name.endsWith(",") || name.endsWith(";") || name.endsWith(")"))// edge case name cleanup
 									name = name.substring(0, name.length() - 1);
 								m.addArg(new Argument(name, type, argFinal));
 							}
@@ -267,7 +281,8 @@ public class UMLData
 			}
 			if (c != null)
 			{
-				System.out.println(c.getDisplay() + "\n\n\n");
+				if (DEBUG)
+					System.out.println(c.getDisplay() + "\n\n\n");
 				classes.add(c);
 			}
 		}
